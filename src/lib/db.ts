@@ -18,13 +18,26 @@ if (!global.mongooseCache) {
   global.mongooseCache = cached;
 }
 
+let lastDbError: string | null = null;
+
+export function getDbStatus() {
+  const uri = process.env.MONGODB_URI;
+  const isConnected = !!(cached.conn && cached.conn.connection.readyState === 1);
+  return {
+    connected: isConnected,
+    uriConfigured: !!uri,
+    error: isConnected ? null : lastDbError,
+  };
+}
+
 export async function connectToDatabase(): Promise<typeof mongoose | null> {
-  if (!MONGODB_URI) {
-    // Return null to allow graceful fallback to in-memory/demo store
+  const uri = process.env.MONGODB_URI;
+  if (!uri) {
+    lastDbError = "MONGODB_URI environment variable is not defined";
     return null;
   }
 
-  if (cached.conn) {
+  if (cached.conn && cached.conn.connection.readyState === 1) {
     return cached.conn;
   }
 
@@ -36,11 +49,13 @@ export async function connectToDatabase(): Promise<typeof mongoose | null> {
     };
 
     cached.promise = mongoose
-      .connect(MONGODB_URI, opts)
+      .connect(uri, opts)
       .then((m) => {
+        lastDbError = null;
         return m;
       })
       .catch((err) => {
+        lastDbError = err.message || "Failed to connect to MongoDB";
         console.warn("[MongoDB] Connection error, using demo fallback:", err.message);
         cached.promise = null;
         return null as unknown as typeof mongoose;
@@ -49,7 +64,13 @@ export async function connectToDatabase(): Promise<typeof mongoose | null> {
 
   try {
     cached.conn = await cached.promise;
-  } catch (e) {
+    if (cached.conn && cached.conn.connection.readyState !== 1) {
+      cached.conn = null;
+      cached.promise = null;
+      return null;
+    }
+  } catch (e: unknown) {
+    lastDbError = e instanceof Error ? e.message : "Unknown connection error";
     cached.promise = null;
     return null;
   }

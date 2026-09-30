@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { AnimalService } from "@/services/animalService";
 import { verifyAdminSession } from "@/lib/auth";
 import { APP_CONFIG } from "@/config/app";
+import { getDbStatus } from "@/lib/db";
 
 // Public: GET /api/animals
 export async function GET(req: NextRequest) {
@@ -11,12 +12,14 @@ export async function GET(req: NextRequest) {
 
     const animals = await AnimalService.getAllAnimals(category);
     const count = await AnimalService.getAnimalCount();
+    const dbStatus = getDbStatus();
 
     return NextResponse.json({
       success: true,
       animals,
       count,
       maxAnimals: APP_CONFIG.MAX_ANIMALS,
+      database: dbStatus,
     });
   } catch (error) {
     console.error("Get animals API error:", error);
@@ -35,8 +38,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json();
-    const { category, breed, age, biyat, price, gender, images, thumbnail, video } = body;
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const { category, breed, age, biyat, price, gender, images, thumbnail, video } = body || {};
 
     // Validate required fields
     if (!category || !breed || age === undefined || price === undefined || !gender) {

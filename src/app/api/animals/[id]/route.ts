@@ -35,7 +35,12 @@ export async function PUT(req: NextRequest, context: RouteContext) {
     }
 
     const { id } = await context.params;
-    const body = await req.json();
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
 
     const updated = await AnimalService.updateAnimal(id, body);
     if (!updated) {

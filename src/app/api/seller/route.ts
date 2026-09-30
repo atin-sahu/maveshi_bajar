@@ -22,7 +22,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { imageUrl, publicId } = await req.json();
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const { imageUrl, publicId } = body || {};
     if (!imageUrl || !publicId) {
       return NextResponse.json(
         { error: "imageUrl and publicId are required" },
